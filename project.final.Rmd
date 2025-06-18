@@ -1,0 +1,195 @@
+---
+title: "project.final"
+output: html_document
+date: "2025-04-28"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+```
+
+### STAT240 DIS336 GROUP4 Project Draft
+##### Group Members: 
+* Brooke Lee
+* Jeonghoo Lee
+* Owen Scott
+* Yixin Wang
+
+
+
+## Introduction:
+The age distribution of a population impacts public policies and services such as healthcare, transportation, and housing. As the United States' population grows, understanding how age demographics differ between ethnic groups can help guide efforts to meet the needs of senior citizens. 
+The main question we will be answering is: *What is the difference in the percentage of senior citizens (individuals aged 65 and over) between U.S. cities that are majority White and those that are majority Asian.* Based on demographic data from the 2010 Census and the 2014–2018 American Community Survey we find strong evidence that Majority-White cities tend to have a higher proportion of senior citizens than Majority-Asian cities.
+
+## Background
+### Data Sources:
+The data was collected by the US Department of Agriculture.  The dataset includes information from the 2010 Decennial Census; the 2014–2018 American Community Survey (ACS), which offers 5-year average estimates of detailed demographic data; and a 2019 supermarket list, which is not used in our analysis.
+Variables: 
+pctWhite: The percentage of individuals in a city that are white from every US city
+pctAsian: The percentage of individuals in a city that are asian from every US city
+pctOld: The percentage of individuals in a city who are aged 65 and older, which we define as the senior citizen population.
+
+### Data Structure:
+Rows: Each row represents a U.S. city or census tract
+Sample size: The dataset includes 72532 entries. While this is a large dataset, demographic information from entire city populations is gathered in each row.
+As we are comparing the senior citizen percentages of Majority-White and Majority-Asian cities, our key variables are pctOld (senior citizen percentage), pctWhite, and pctAsian.
+
+### Data Cleaning and Processing:
+* The dataset was first cleansed by removing all irrelevant data columns as the census dataset we are pulling variables from is quite large. The only variables kept were: “Pop2010”, “TractWhite”, “TractAsian”, and “TractSeniors”
+* Three new variables were then added to this new “cleansed” dataset representing the percentage of White, Asian, and Senior citizens in reference to the unique population of each county. These variables were called: Wpct, Apct, and Opct respectively.
+* Two finalized datasets were created called “arranged.w” and “arranged.a”, which sorted the cleaned dataset by white and asian population percentages (respectively) in ascending order. Two different datasets were needed to plot the average senior population percentage of predominantly White and predominantly Asian population on the same graph for better visualization purposes.
+
+### Visual Articulation and Interpretation
+
+
+```{r}
+#Importing Tidyverse to Run Tidyverse Functions for Visualization
+library(tidyverse)
+
+#Importing Data Set
+census.test <- read_csv("../datasets/Striped.FoodAccessResearchAtlasData20191.csv")
+
+#Cleaning Data Set
+census.cleaned <- census.test %>% 
+  select(Pop2010,TractWhite,TractAsian,TractSeniors) %>%
+   mutate(Wpct = TractWhite/Pop2010,
+          Apct =  TractAsian/Pop2010,
+          Opct = TractSeniors/Pop2010)
+
+#Creating separate data sets for both tested variables
+arranged.w <- census.cleaned %>% 
+  arrange(Wpct)
+
+arranged.a <- census.cleaned %>% 
+  arrange(Apct)
+
+#Creating quantile variables to overlay on scatter plot
+census.cleaned.na <- census.cleaned %>% drop_na()
+
+iqr = IQR(census.cleaned.na$Opct)
+firstQuartile = quantile(census.cleaned.na$Opct, 0.25)
+thirdQuartile = quantile(census.cleaned.na$Opct, 0.75)
+
+#Creating mean value variables to overlay on scatter plot
+Amajority <- census.cleaned %>% 
+  filter(Apct >= 0.5) %>% pull(Opct)
+A_mean <- mean(Amajority)
+
+Wmajority <- census.cleaned %>% 
+  filter(Wpct >= 0.5) %>% pull(Opct)
+W_mean <- mean(Wmajority)
+
+
+#Creating Scatter Plot
+ggplot() + 
+  geom_point(data = arranged.w, mapping = aes(x = Wpct, y = Opct, color = "White Citzen Population", alpha = Pop2010)) +
+  geom_point(data = arranged.a, mapping = aes(x = Apct, y = Opct, color = "Asian Citzen Population", alpha = Pop2010)) +
+  scale_color_manual(values = c("White Citzen Population" = "skyblue", "Asian Citzen Population" = "pink"), name = "Key") +
+  scale_alpha_continuous(name = "Population (2010)") +
+  geom_hline(yintercept = W_mean, linetype = "dashed", color = "navy", size = 0.5) +
+  geom_hline(yintercept = A_mean, linetype = "dashed", color = "maroon", size = 0.5) +
+  geom_hline( yintercept = c(firstQuartile - iqr, thirdQuartile + iqr)) +
+  theme_minimal() + 
+  labs(x = "Ethnicity Percentage of Population", y = "Senior Citizen Population Percentage")
+    # theme(legend.position = "top")
+```
+
+
+* **Graph Construction:** This scatterplot showcases the senior population percentage as the population percentage of white (blue) and asian(pink) citizens increase. The scatterplot also has an alpha(transparency) value assigned to population so the points are more visible if the population is larger.
+* **Scatterplot Interpretation:** As shown by the graph both these populations follow very similar shapes, with the only difference being the frequency in which extremes values occur. The asian population data has more extremes as the ethnic percentage of population value nears 0, and the inverse observation can be made for the white population. This is likely due to the aggregate ethnic split of population of the US, which is majority white, and minority asian, meaning we observe more extremes in areas of the population where we have more data points available.
+* **Observed Variable Significance:** Overlayed on the scatterplot is a box plot with the 75% and 25% quantile range along with the mean senior living population percentage for both populations graphed in a dashed line with a slighly darker shade of pink and blue for asian and white populations respectively.
+* **Graphical Conclusion:** There is barely any difference between the two population means (dashed lines) which suggests no relationship between variables, but we decided to still conduct an inference test to confirm our speculations.
+
+
+## Statistical Analysis
+
+### Parameter of Interest
+
+
+- True mean senior‑citizen percentage in majority‑White tracts  
+$$X \sim D_w(\mu_w, \sigma_w^2)$$  
+- True mean senior‑citizen percentage in majority‑Asian tracts 
+$$X \sim D_a(\mu_a, \sigma_a^2)$$
+
+
+### Type of Inference
+
+
+We will perform a **Welch two‑sample *t*-test** (does not assume equal variances) to test for a difference in means.
+
+
+### Assumptions
+
+
+1. **Independence.** The two groups (majority‑White vs. majority‑Asian) are independent.  
+2. **Random sampling.** Each tract is representative of its group.  
+3. **Approximate normality.** With large \(n\), sample means are approximately normal (CLT).
+
+
+### Hypotheses
+
+
+\[
+\begin{aligned}
+H_0:&\ \mu_A - \mu_W = 0,\\
+H_1:&\ \mu_A - \mu_W \neq 0.
+\end{aligned}
+\]
+
+
+### Test Statistic
+
+
+\[
+t = \frac{\bar Y - \bar X}
+{\sqrt{\displaystyle \frac{s_Y^2}{n_A} + \frac{s_X^2}{n_W}}}
+\]
+where \(\bar X,\bar Y\) are sample means, \(s_X^2,s_Y^2\) are sample variances, and \(n_W,n_A\) are sample sizes.  
+Degrees of freedom \(\nu\) are calculated via Welch’s formula.
+
+
+
+### Results and Interpretation
+
+
+The Welch two‑sample *t*‑test on senior‑citizen percentage (`Opct`) by group produced:
+
+
+- **Test statistic:**  
+  \[
+    t = -1.805,\quad df \approx 594.6
+  \]
+- **P‑value:**  
+  \[
+    p = 0.0716
+  \]
+- **95% confidence interval for** \(\mu_A - \mu_W\):  
+  \[
+    [-1.0333,\;0.0436]
+  \]
+- **Sample means:**  
+  \[
+    \bar Y_{\text{Asian}} = 13.94\%,\quad
+    \bar X_{\text{White}} = 14.44\%
+  \]
+  (Observed mean difference \(\bar Y - \bar X = -0.495\%\).)
+Since \(p = 0.0716 > 0.05\) and the confidence interval includes 0, we **fail to reject** the null hypothesis \(H_0: \mu_A - \mu_W = 0\).  In other words, at the 5% significance level, there is no statistically significant difference in the average senior‑citizen percentage between majority‑Asian and majority‑White tracts.
+
+## Discussion
+
+### Further Interpretation
+* **P-value Interpretation:** We did a two-sample t-test to compare the senior citizen population percentages between majority-Asian and majority-White cities. The inference test we ran produced a p-value which fell within the 95% confidence level for our null hypothesis. Considering this result, we are unable to fully reject the null hypothesis and also unable to consider the alternative hypothesis that there is a statistically significant difference in the senior citizen population percentage between majority-Asian and majority-White cities.
+* **For non-statistical readers:** The p-value represents the probability of observing our sample data if there were actually no difference in senior citizen percentages between the two groups. Since the p-value is greater than 0.05, we can’t conclude that the observed difference is meaningful rather than due to random variation. Furthermore, the 95% confidence interval for the difference in means, which ranges from -1.0333% to 0.0436%, includes 0. The inclusion of 0 in the interval means that there may not be a significant difference between the two groups’ percentage of senior citizens. 
+* **Conclusion:** The p-value and confidence interval both shows that while our data showed a small difference in means, the difference is not significant. Thus, we cannot say that senior citizen population percentages differ by ethnicity between majority-Asian and majority-White cities.
+
+### Shortcomings of the Analysis
+
+* **Broad Variables:** The definition of “White” and “Asian” by US Census standards is incredibly broad, making it hard to derive any meaningful conclusions even if there was statistical significance behind our testing.
+* **Correlation vs. Causation:** We are only testing for correlation, the actual causation behind why older populations are more abundant in majority-Asian cities would require further research with more variables to provide a specific answer.
+* **Outdated Data:** The census data in which the hypothesis test and graphical visualization were created was surveyed in 2010. This data is over 15 years old, which means that conditions could have changed by a significant margin, and thus also the conclusions we are able to make.
+* **Further Data Cleaning:** When observing the initial graphical visualization outputs it was noticed that the graph seemed to jut upwards when nearing both ends on the x-axis. This is because lower populations host a higher frequency of ethnic population extremes. Adding a parameter during initial data cleaning to account for cities with lower populations could produce a more accurate visual representation.
+
+### Additional Questions and Recommendations for Future Research
+
+* Running a **multiple regression analysis** on all variables provided in the original Census Dataset could provide more context to what variables are related to each other, and be used as a better jumping off point for further relationship analysis.
+* Referencing a dataset with **more specific ethnic definitions** behind “Asian” and “White” populations (such as splitting up ethnic populations by different countries of origin) could provide a much more accurate look at culture norm standards and relationships between
